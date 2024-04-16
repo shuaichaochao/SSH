@@ -117,13 +117,6 @@ def load_config():
     parser.add_argument('--in_chans', type=int, default=3)
     # parser.add_argument('--out_chans', type=int, default=96)
 
-
-    # MDSHC parameter
-    parser.add_argument('--epoch_change', type=int, default=9)
-    parser.add_argument('--beta', default=1.0, type=float, help='Hyper-parameter.(default: 1.0)')
-    parser.add_argument('--lamda', default=0.0001, type=float, help='Hyper-parameter.(default: 0.0001)')
-    parser.add_argument('--mome', default=0.5, type=float, help='Hyper-parameter.(default: 0.9)')
-
     args = parser.parse_args()
 
     # GPU
