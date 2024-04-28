@@ -52,15 +52,66 @@ class UnNormalize:
         return torch.clamp(x,0,None)
 
 
+class MSCA(nn.Module):
+    def __init__(self, channels=64, r=4):
+        super(MSCA, self).__init__()
+        out_channels = int(channels // r)
+        # local_att
+        self.local_att = nn.Sequential(
+            nn.Conv2d(channels, out_channels, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, channels, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(channels)
+        )
+
+        # global_att
+        self.global_att = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(channels, out_channels, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, channels, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(channels)
+        )
+
+        self.sig = nn.Sigmoid()
+
+    def forward(self, x):
+
+        xl = self.local_att(x)
+        xg = self.global_att(x)
+        xlg = xl + xg
+        wei = self.sig(xlg)
+
+        return wei
+
+class AFFM(nn.Module):
+    def __init__(self, channel=64):
+        super(AFFM, self).__init__()
+
+        self.msca = MSCA()
+
+    def forward(self, x, y):
+
+        xy = x + y
+        wei = self.msca(xy)
+        xo = x * wei + y * (1 - wei)
+
+        return xo
+
+
+
 class Baseline(nn.Module):
     def __init__(self, args, code_length=12, num_classes=200, pretrained=True):
         super(Baseline, self).__init__()
         self.backbone_global = resnet50(islocal=False, pretrained=pretrained, num_classes=num_classes)
         self.backbone_local = resnet50(islocal=True, pretrained=pretrained, num_classes=num_classes)
         self.sample = Saliency_Sampler(args.device, self.backbone_global, 1024, 224, 224)
+        
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Linear(2048, code_length)
-
+        self.affm = AFFM()
         self.act2 = nn.Tanh()
         self.softmax = nn.Softmax(dim=1)
         self.unNormalize = UnNormalize(args.device)
@@ -72,9 +123,8 @@ class Baseline(nn.Module):
         room_fea, orginal_fea, sample_map = self.sample(x)
         x_room = self.unNormalize(room_fea)
         room_fea, room_midfea = self.backbone_global(room_fea)
-
-
-        hash_code = orginal_fea+room_fea
+        hash_code = self.affm(orginal_fea, room_fea)
+        # hash_code = orginal_fea+room_fea
         hash_code = self.avgpool(hash_code)
         hash_code = torch.flatten(hash_code, 1)
         hash_code = self.fc(hash_code)
