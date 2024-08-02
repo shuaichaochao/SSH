@@ -19,15 +19,7 @@ def train(query_dataloader, train_dataloader, retrieval_dataloader, code_length,
 
     model = baseline.baseline(args, code_length=code_length, num_classes=args.num_classes, pretrained=True)
     args.hash_bit = code_length
-
-    # num_classes, att_size, feat_size = args.num_classes, 1, 2048
-    # model = SEMICON.semicon(code_length=code_length, num_classes=num_classes, att_size=att_size, feat_size=feat_size,
-    #                         device=args.device, pretrained=True)
-
     model.to(args.device)
-
-
-
 
     # (Statistical model calculation and number of parameters)
     # flops, num_params = get_model_complexity_info(model, (3, 224, 224), as_strings=True, print_per_layer_stat=False)
